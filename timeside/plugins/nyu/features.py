@@ -231,6 +231,8 @@ def onset_patterns(x,
                    aggregate_fn=np.mean):
     """
     Calculate the onset patterns rhythm feature. In Holzapfel[1] and Pohle[2], they use a sampling rate of 22050 Hz.
+    f_ parameters are for the first logf transform (time domain to frequency domain). p_ parameters are for the second
+    logf transform (performed on each band of onset signals to represent onset periodicity).
 
     References
     ----------
