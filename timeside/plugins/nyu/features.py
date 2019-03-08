@@ -7,13 +7,18 @@ import scipy.signal
 import scipy.fftpack as fft
 
 from librosa import cqt, magphase, note_to_hz, stft, resample, to_mono
-from librosa import amplitude_to_db, get_duration, time_to_frames
+from librosa import amplitude_to_db, get_duration, time_to_frames, power_to_db
 from librosa.util import fix_length
-from librosa.feature import melspectrogram
+from librosa.feature import melspectrogram, rms, tempogram
+from librosa.decompose import hpss
+from librosa.onset import onset_strength
 
 from librosa.filters import get_window
 from librosa.core.audio import resample
 from librosa import util
+
+from .vggish import mel_features
+from .vggish import vggish_params
 
 
 def process_arguments(args):
@@ -30,11 +35,14 @@ def process_arguments(args):
 
 def _frames_helper(y, y_frames, n_fft, power=1.0):
     if y_frames is not None:
-        S = frames_stft(y_frames=y_frames,
+        D = frames_stft(y_frames=y_frames,
                         n_fft=n_fft)
 
-        Sm = np.abs(S) ** power
-        Sp = np.angle(S)
+        if power is not None:
+            Sm = np.abs(D) ** power
+            Sp = np.angle(D)
+        else:
+            return D
         y = None
     else:
         Sm = None
@@ -78,6 +86,27 @@ def frames_stft(y_frames, n_fft=2048, win_length=None, window='hann',
                                             axis=0)[:stft_matrix.shape[0]]
 
     return stft_matrix
+
+
+def percussive_ratio(y=None, y_frames=None, n_fft=2048, hop_size=512, margin=1.0):
+    """
+    Compute ratio of percussive power to total power
+    """
+
+    # default for 22050
+    if y is not None:
+        D = stft(y, n_fft=n_fft, hop_size=hop_size)
+    elif y_frames is not None:
+        D = frames_stft(y_frames, n_fft=n_fft, hop_size=hop_size)
+    H, P = hpss(D, margin=margin)
+
+    Pm, Pp = magphase(P)
+    S, phase = magphase(D)
+
+    P_rms = rms(Pm)
+    S_rms = rms(S)
+
+    return amplitude_to_db(P_rms / S_rms)
 
 
 def melspec(y=None, y_frames=None, sr=22050, n_fft=2048,
@@ -126,6 +155,135 @@ def _logspec_matrix(bins_per_octave, num_bins, f_min, fft_len, sr):
         wk = np.hstack([w1[0:l1], w2[l2:]])  # concatenate two halves
         c_mat[k-1, kc[k-1]:(kc[k+1]+1)] = wk / np.sum(wk)  # normalized to unit sum;
     return c_mat
+
+
+def _onset_patterns_params(sr, f_hop_size, f_win_size, p_hop_size, p_win_size, mean_filter_size):
+    """
+    Calculate onset patterns parameters
+    """
+    if f_hop_size is None:
+        # if not specified, set to 0.01 seconds, this hop size is twice as frequent as Holzapfel's,
+        # but matches Juan's code.
+        f_hop_size = int(2 ** np.ceil(np.log2(0.01 * sr)))
+    if f_win_size is None:
+        # if not specified, set to 0.04 seconds (this was 0.046s at 44100Hz when rounded, as in Holzapfel's)
+        f_win_size = f_hop_size * 4
+    p_sr = sr / f_hop_size
+    if p_hop_size is None:
+        # if not specified, set to 0.5 seconds
+        p_hop_size = int(np.round(0.5 * p_sr))
+    if p_win_size is None:
+        # if not specified, set to 8 seconds. Holzapfel said that more than 8 seconds was detrimental because we want
+        # stationarity
+        p_win_size = int(np.round(8 * p_sr))
+    if mean_filter_size is None:
+        # if not specified, set to 0.25 seconds
+        mean_filter_size = int(round(0.25 * p_sr))
+
+    return f_hop_size, f_win_size, p_sr, p_hop_size, p_win_size, mean_filter_size
+
+
+def _onset_detection_fn(x, f_win_size, f_hop_size, f_bins_per_octave, f_octaves, f_fmin, sr, mean_filter_size):
+    """
+    Filter bank for onset pattern calculation
+    """
+    # calculate frequency constant-q transform
+    f_win = scipy.signal.hanning(f_win_size)
+    x_spec = stft(x,
+                  n_fft=f_win_size,
+                  hop_length=f_hop_size,
+                  win_length=f_win_size,
+                  window=f_win)
+    x_spec = np.abs(x_spec) / (2 * np.sum(f_win))
+
+    f_cq_mat = _logspec_matrix(f_bins_per_octave, f_octaves * f_bins_per_octave, f_fmin, f_win_size, sr)
+    x_cq_spec = np.dot(f_cq_mat, x_spec[:-1, :])
+
+    # subtract moving mean
+    b = np.concatenate([[1], np.ones(mean_filter_size, dtype=float) / -mean_filter_size])
+    od_fun = scipy.signal.lfilter(b, 1, x_cq_spec, axis=1)
+
+    # half-wave rectify
+    od_fun = np.maximum(0, od_fun)
+
+    # post-process OPs
+    od_fun = np.log10(1 + 1000*od_fun)
+    return od_fun, x_cq_spec
+
+
+def onset_patterns(x,
+                   sr,
+                   f_hop_size=None,
+                   f_win_size=None,
+                   f_fmin=150,
+                   f_octaves=6,
+                   f_bins_per_octave=10,
+                   mean_filter_size=None,
+                   p_hop_size=None,
+                   p_win_size=None,
+                   p_fmin=0.5,
+                   p_octaves=5,
+                   p_bins_per_octave=12,
+                   aggregate_fn=np.mean):
+    """
+    Calculate the onset patterns rhythm feature. In Holzapfel[1] and Pohle[2], they use a sampling rate of 22050 Hz.
+
+    References
+    ----------
+
+
+    Parameters
+    ----------
+    x
+    sr
+    f_hop_size
+    f_win_size
+    f_fmin
+    f_octaves
+    f_bins_per_octave
+    mean_filter_size
+    p_hop_size
+    p_win_size
+    p_fmin
+    p_octaves
+    p_bins_per_octave
+    aggregate_fn
+
+    Returns
+    -------
+    ops
+    """
+    f_hop_size, f_win_size, p_sr, p_hop_size, p_win_size, mean_filter_size = _onset_patterns_params(sr,
+                                                                                                    f_hop_size,
+                                                                                                    f_win_size,
+                                                                                                    p_hop_size,
+                                                                                                    p_win_size,
+                                                                                                    mean_filter_size)
+
+    # normalize
+    x /= np.max(np.abs(x))
+
+    od_fun, x_cq_spec = _onset_detection_fn(x, f_win_size, f_hop_size, f_bins_per_octave, f_octaves, f_fmin, sr, mean_filter_size)
+
+    # calculate periodicity constant-q transform
+    ops = np.empty([od_fun.shape[0], p_octaves * p_bins_per_octave, int(np.ceil(od_fun.shape[1] / p_hop_size))])
+    p_cq_mat = _logspec_matrix(p_bins_per_octave, p_octaves * p_bins_per_octave, p_fmin, p_win_size, p_sr)
+    p_win = scipy.signal.hanning(p_win_size)
+    for i in range(od_fun.shape[0]):
+        od_spec = stft(od_fun[i, :],
+                       n_fft=p_win_size,
+                       hop_length=p_hop_size,
+                       win_length=p_win_size,
+                       window=p_win)
+        od_spec = np.abs(od_spec) / (2 * np.sum(p_win))
+        od_cq_spec = np.dot(p_cq_mat, od_spec[:-1, :])
+        ops[i, :, :] = od_cq_spec
+
+    # aggregate ops if `aggregate_fn` is not None
+    if aggregate_fn is not None:
+        ops = aggregate_fn(ops, axis=2)
+
+    return ops
 
 
 def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512):
@@ -210,6 +368,24 @@ def hcqt(y, sr=22040, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, 
     return cqt_mag, cqt_phase
 
 
+def vggish_melspec(y, sr=22050):
+    """
+    Extract melspec for vggish model
+    """
+    if sr != vggish_params.SAMPLE_RATE:
+        y = resample(y, sr, vggish_params.SAMPLE_RATE)
+
+    log_mel = mel_features.log_mel_spectrogram(y,
+                                               audio_sample_rate=vggish_params.SAMPLE_RATE,
+                                               log_offset=vggish_params.LOG_OFFSET,
+                                               window_length_secs=vggish_params.STFT_WINDOW_LENGTH_SECONDS,
+                                               hop_length_secs=vggish_params.STFT_HOP_LENGTH_SECONDS,
+                                               num_mel_bins=vggish_params.NUM_MEL_BINS,
+                                               lower_edge_hertz=vggish_params.MEL_MIN_HZ,
+                                               upper_edge_hertz=vggish_params.MEL_MAX_HZ)
+    return log_mel
+
+
 if __name__ == '__main__':
     import soundfile
     import tqdm
@@ -233,10 +409,17 @@ if __name__ == '__main__':
         sr = 22050
         y = resample(y, _sr, sr)
 
-        output['y_linspec_mag'], output['y_linspec_phase'] = linspec(y)
-        output['y_melspec'] = melspec(y, sr=sr)
-        output['y_logspec'] = logspec(y, sr=sr)
-        output['y_hcqt_mag'], output['y_hcqt_phase'] = hcqt(y, sr=sr)
+        output['linspec_mag'], output['linspec_phase'] = linspec(y)
+        output['melspec'] = melspec(y, sr=sr)
+        output['logspec'] = logspec(y, sr=sr)
+        output['hcqt_mag'], output['hcqt_phase'] = hcqt(y, sr=sr)
+        output['vggish_melspec'] = vggish_melspec(y, sr=sr)
+
+        # high-level
+        output['percussive_ratio'] = percussive_ratio(y, margin=3.0)
+        output['onset_strength'] = onset_strength(y, detrend=True)
+        output['tempogram'] = tempogram(y)
+        output['onset_patterns'] = onset_patterns(y, sr=sr)
 
         subdir, output_file = os.path.split(af.split(params.audio_directory)[1])
         output_file = os.path.splitext(output_file)[0]
