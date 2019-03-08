@@ -17,9 +17,10 @@ from librosa.filters import get_window
 from librosa.core.audio import resample
 from librosa import util
 
-from .vggish import mel_features
-from .vggish import vggish_params
+from vggish import mel_features
+from vggish import vggish_params
 
+from multiprocessing import Pool
 
 def process_arguments(args):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -29,6 +30,9 @@ def process_arguments(args):
 
     parser.add_argument('output_directory', type=str,
                         help="Path to output directory.")
+
+    parser.add_argument('cpus', type=int,
+                        help="Number of processors")
 
     return parser.parse_args(args)
 
@@ -95,9 +99,9 @@ def percussive_ratio(y=None, y_frames=None, n_fft=2048, hop_size=512, margin=1.0
 
     # default for 22050
     if y is not None:
-        D = stft(y, n_fft=n_fft, hop_size=hop_size)
+        D = stft(y, n_fft=n_fft, hop_length=hop_size)
     elif y_frames is not None:
-        D = frames_stft(y_frames, n_fft=n_fft, hop_size=hop_size)
+        D = frames_stft(y_frames, n_fft=n_fft, hop_length=hop_size)
     H, P = hpss(D, margin=margin)
 
     Pm, Pp = magphase(P)
@@ -277,7 +281,7 @@ def onset_patterns(x,
                        window=p_win)
         od_spec = np.abs(od_spec) / (2 * np.sum(p_win))
         od_cq_spec = np.dot(p_cq_mat, od_spec[:-1, :])
-        ops[i, :, :] = od_cq_spec
+        ops[i, :, :] = od_cq_spec[:ops[i, :, :].shape[0], :ops[i, :, :].shape[1]]
 
     # aggregate ops if `aggregate_fn` is not None
     if aggregate_fn is not None:
@@ -386,6 +390,34 @@ def vggish_melspec(y, sr=22050):
     return log_mel
 
 
+def extract(args):
+    audio_directory, output_directory, af = args
+    output = dict()
+
+    y, _sr = soundfile.read(af)
+    y = to_mono(y)
+    sr = 22050
+    y = resample(y, _sr, sr)
+
+    output['linspec_mag'], output['linspec_phase'] = linspec(y)
+    output['melspec'] = melspec(y, sr=sr)
+    output['logspec'] = logspec(y, sr=sr)
+    output['hcqt_mag'], output['hcqt_phase'] = hcqt(y, sr=sr)
+    output['vggish_melspec'] = vggish_melspec(y, sr=sr)
+
+    # high-level
+    output['percussive_ratio'] = percussive_ratio(y, margin=3.0)
+    output['onset_strength'] = onset_strength(y, detrend=True)
+    output['tempogram'] = tempogram(y)
+    output['onset_patterns'] = onset_patterns(y, sr=sr)
+
+    subdir, output_file = os.path.split(af.split(audio_directory)[1])
+    output_file = os.path.splitext(output_file)[0]
+    output_file = os.path.join(output_directory, output_file)
+
+    np.savez_compressed(output_file, **output)
+
+
 if __name__ == '__main__':
     import soundfile
     import tqdm
@@ -401,30 +433,9 @@ if __name__ == '__main__':
     if not os.path.exists(params.output_directory):
         os.makedirs(params.output_directory)
 
-    for af in tqdm.tqdm(audio_files):
-        output = dict()
+    p = Pool(processes=params.cpus)
+    max_ = len(audio_files)
+    ret = p.map(extract, [(params.audio_directory, params.output_directory, af) for af in audio_files])
 
-        y, _sr = soundfile.read(af)
-        y = to_mono(y)
-        sr = 22050
-        y = resample(y, _sr, sr)
-
-        output['linspec_mag'], output['linspec_phase'] = linspec(y)
-        output['melspec'] = melspec(y, sr=sr)
-        output['logspec'] = logspec(y, sr=sr)
-        output['hcqt_mag'], output['hcqt_phase'] = hcqt(y, sr=sr)
-        output['vggish_melspec'] = vggish_melspec(y, sr=sr)
-
-        # high-level
-        output['percussive_ratio'] = percussive_ratio(y, margin=3.0)
-        output['onset_strength'] = onset_strength(y, detrend=True)
-        output['tempogram'] = tempogram(y)
-        output['onset_patterns'] = onset_patterns(y, sr=sr)
-
-        subdir, output_file = os.path.split(af.split(params.audio_directory)[1])
-        output_file = os.path.splitext(output_file)[0]
-        output_file = os.path.join(params.output_directory, output_file)
-
-        np.savez_compressed(output_file, **output)
 
 
