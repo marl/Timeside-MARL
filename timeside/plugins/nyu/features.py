@@ -6,7 +6,7 @@ import numpy as np
 import scipy.signal
 import scipy.fftpack as fft
 
-from librosa import cqt, magphase, note_to_hz, stft, resample, to_mono
+from librosa import cqt, magphase, note_to_hz, stft, resample, to_mono, load
 from librosa import amplitude_to_db, get_duration, time_to_frames, power_to_db
 from librosa.util import fix_length
 from librosa.feature import melspectrogram, rms, tempogram
@@ -394,10 +394,13 @@ def extract(args):
     audio_directory, output_directory, af = args
     output = dict()
 
-    y, _sr = soundfile.read(af)
-    y = to_mono(y)
-    sr = 22050
-    y = resample(y, _sr, sr)
+    try:
+        y, _sr = soundfile.read(af)
+        y = to_mono(y)
+        sr = 22050
+        y = resample(y, _sr, sr)
+    except Exception as e:
+        y, sr = load(af)
 
     output['linspec_mag'], output['linspec_phase'] = linspec(y)
     output['melspec'] = melspec(y, sr=sr)
