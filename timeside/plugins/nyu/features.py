@@ -401,6 +401,7 @@ def extract(args):
     output_file = os.path.join(output_directory, output_file)
 
     if os.path.exists(output_file) and not overwrite:
+        print('Skipping {}. Already exists.'.format(output_file))
         return
 
     output = dict()
