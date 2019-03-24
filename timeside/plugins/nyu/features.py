@@ -34,6 +34,8 @@ def process_arguments(args):
     parser.add_argument('cpus', type=int,
                         help="Number of processors")
 
+    parser.add_argument('--overwrite', action='store_true', default=False)
+
     return parser.parse_args(args)
 
 
@@ -393,7 +395,14 @@ def vggish_melspec(y, sr=22050):
 
 
 def extract(args):
-    audio_directory, output_directory, af = args
+    audio_directory, output_directory, af, overwrite = args
+    subdir, output_file = os.path.split(af.split(audio_directory)[1])
+    output_file = os.path.splitext(output_file)[0]
+    output_file = os.path.join(output_directory, output_file)
+
+    if os.path.exists(output_file) and not overwrite:
+        return
+
     output = dict()
 
     try:
@@ -416,10 +425,6 @@ def extract(args):
     output['tempogram'] = tempogram(y)
     output['onset_patterns'] = onset_patterns(y, sr=sr)
 
-    subdir, output_file = os.path.split(af.split(audio_directory)[1])
-    output_file = os.path.splitext(output_file)[0]
-    output_file = os.path.join(output_directory, output_file)
-
     np.savez_compressed(output_file, **output)
 
 
@@ -440,7 +445,7 @@ if __name__ == '__main__':
 
     p = Pool(processes=params.cpus)
     max_ = len(audio_files)
-    ret = p.map(extract, [(params.audio_directory, params.output_directory, af) for af in audio_files])
+    ret = p.map(extract, [(params.audio_directory, params.output_directory, af, params.overwrite) for af in audio_files])
 
 
 
