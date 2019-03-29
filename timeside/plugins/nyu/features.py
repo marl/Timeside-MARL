@@ -109,10 +109,10 @@ def percussive_ratio(y=None, y_frames=None, n_fft=2048, hop_size=512, margin=1.0
     Pm, Pp = magphase(P)
     S, phase = magphase(D)
 
-    P_rms = rms(Pm)
-    S_rms = rms(S)
+    P_rms = rms(S=Pm)
+    S_rms = rms(S=S)
 
-    return amplitude_to_db(P_rms / S_rms)
+    return amplitude_to_db(P_rms / S_rms), P_rms, S_rms
 
 
 def melspec(y=None, y_frames=None, sr=22050, n_fft=2048,
@@ -421,7 +421,7 @@ def extract(args):
     output['vggish_melspec'] = vggish_melspec(y, sr=sr)
 
     # high-level
-    output['percussive_ratio'] = percussive_ratio(y, margin=3.0)
+    output['percussive_ratio'], output['percussive_rms'], output['total_rms'] = percussive_ratio(y, margin=3.0)
     output['onset_strength'] = onset_strength(y, detrend=True)
     output['tempogram'] = tempogram(y)
     output['onset_patterns'] = onset_patterns(y, sr=sr)
