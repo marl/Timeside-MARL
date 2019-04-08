@@ -346,7 +346,7 @@ def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, fmin=0.0,
     return y_logspec.astype(np.float32)
 
 
-def hcqt(y, sr=22040, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, harmonics=(0.5, 1, 2, 3, 4, 5)):
+def hcqt(y, sr=22050, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, harmonics=(0.5, 1, 2, 3, 4, 5)):
     """
     Harmonic CQT. Compute CQT at harmonics of `fmin`. See librosa for cqt params.
     """
