@@ -61,12 +61,12 @@ class NYUVGGishMelSpectrogam(Analyzer):
         return frames, eod
 
     def post_process(self):
-        result = self.new_result(data_mode='value', time_mode='framewise')
+        self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y = np.hstack(self.values)
+        self.y = np.hstack(self.values)
 
-        y_vggish_melspec = vggish_melspec(y=y,
+        self.y_vggish_melspec = vggish_melspec(y=self.y,
                                           sr=self.samplerate(), )
 
-        result.data_object.value = y_vggish_melspec
-        self.add_result(result)
+        self.result.data_object.value = self.y_vggish_melspec
+        self.add_result(self.result)

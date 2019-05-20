@@ -69,13 +69,13 @@ class NYUHCQT(Analyzer):
         return frames, eod
 
     def post_process(self):
-        result = self.new_result(data_mode='value', time_mode='framewise')
+        self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y = np.hstack(self.values)
+        self.y = np.hstack(self.values)
 
-        y_hcqt, _ = hcqt(y, sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
+        self.y_hcqt, _ = hcqt(self.y, sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
                          bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
                          harmonics=self.harmonics)
 
-        result.data_object.value = y_hcqt
-        self.add_result(result)
+        self.result.data_object.value = self.y_hcqt
+        self.add_result(self.result)

@@ -63,13 +63,13 @@ class NYULogSpectrogam(Analyzer):
         return frames, eod
 
     def post_process(self):
-        result = self.new_result(data_mode='value', time_mode='framewise')
+        self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y_frames = np.vstack(self.values).T
+        self.y_frames = np.vstack(self.values).T
 
-        y_logspec = logspec(y_frames=y_frames,
+        self.y_logspec = logspec(y_frames=self.y_frames,
                             n_fft=self.input_blocksize,
                             hop_size=self.input_stepsize, )
 
-        result.data_object.value = y_logspec
-        self.add_result(result)
+        self.result.data_object.value = self.y_logspec
+        self.add_result(self.result)
