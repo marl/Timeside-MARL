@@ -69,14 +69,11 @@ class NYUMelSpectrogam(Analyzer):
     def post_process(self):
         self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        self.y_frames = np.vstack(self.values).T
-
-        self.y_melspec = melspec(y_frames=self.y_frames,
+        self.result.data_object.value = melspec(y_frames=np.vstack(self.values).T,
                             sr=self.samplerate(),
                             n_fft=self.input_blocksize,
                             hop_size=self.input_stepsize,
                             n_mels=self.n_mels,
                             fmin=self.fmin)
 
-        self.result.data_object.value = self.y_melspec
         self.add_result(self.result)

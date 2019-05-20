@@ -63,10 +63,7 @@ class NYUVGGishMelSpectrogam(Analyzer):
     def post_process(self):
         self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        self.y = np.hstack(self.values)
-
-        self.y_vggish_melspec = vggish_melspec(y=self.y,
+        self.result.data_object.value = vggish_melspec(y=np.hstack(self.values),
                                           sr=self.samplerate(), )
 
-        self.result.data_object.value = self.y_vggish_melspec
         self.add_result(self.result)
