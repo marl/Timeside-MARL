@@ -19,7 +19,7 @@ class NYUVGGishMelSpectrogam(Analyzer):
     def __init__(self,
                  input_blocksize=256,
                  input_stepsize=256,
-                 input_samplerate=16000):
+                 input_samplerate=22050):
         super(NYUVGGishMelSpectrogam, self).__init__()
         self.input_blocksize = input_blocksize
         self.input_stepsize = input_stepsize
