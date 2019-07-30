@@ -22,6 +22,7 @@ from vggish import vggish_params
 
 from multiprocessing import Pool
 
+
 def process_arguments(args):
     parser = argparse.ArgumentParser(description=__doc__)
 
@@ -376,11 +377,11 @@ def hcqt(y, sr=22050, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, 
     return cqt_mag, cqt_phase
 
 
-def vggish_melspec(y, sr=22050):
+def vggish_melspec(y, sr=22050, do_resample=False):
     """
     Extract melspec for vggish model
     """
-    if sr != vggish_params.SAMPLE_RATE:
+    if sr != vggish_params.SAMPLE_RATE and do_resample:
         y = resample(y, sr, vggish_params.SAMPLE_RATE)
 
     log_mel = mel_features.log_mel_spectrogram(y,
