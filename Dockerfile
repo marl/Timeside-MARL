@@ -24,7 +24,8 @@ WORKDIR /srv/src/timeside-dummy
 # Clone app
 ADD . /srv/src/timeside-dummy/
 
-RUN conda install librosa=0.6.3 
+RUN pip install pyyaml
+RUN pip install librosa==0.7.0
 
 # Install TimeSide Dummy
 RUN pip install -e .

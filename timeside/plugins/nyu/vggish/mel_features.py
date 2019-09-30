@@ -70,7 +70,8 @@ def periodic_hann(window_length):
 
 def stft_magnitude(signal, fft_length,
                    hop_length=None,
-                   window_length=None):
+                   window_length=None,
+                   frames=None):
   """Calculate the short-time Fourier transform magnitude.
 
   Args:
@@ -83,7 +84,8 @@ def stft_magnitude(signal, fft_length,
     2D np.array where each row contains the magnitudes of the fft_length/2+1
     unique values of the FFT for the corresponding frame of input samples.
   """
-  frames = frame(signal, window_length, hop_length)
+  if frames is None:
+    frames = frame(signal, window_length, hop_length)
   # Apply frame window to each frame. We use a periodic Hann (cosine of period
   # window_length) instead of the symmetric Hann of np.hanning (period
   # window_length-1).
@@ -185,6 +187,7 @@ def spectrogram_to_mel_matrix(num_mel_bins=20,
 
 
 def log_mel_spectrogram(data,
+                        frames=None,
                         audio_sample_rate=8000,
                         log_offset=0.0,
                         window_length_secs=0.025,
@@ -209,6 +212,7 @@ def log_mel_spectrogram(data,
   fft_length = 2 ** int(np.ceil(np.log(window_length_samples) / np.log(2.0)))
   spectrogram = stft_magnitude(
       data,
+      frames=frames,
       fft_length=fft_length,
       hop_length=hop_length_samples,
       window_length=window_length_samples)

@@ -8,6 +8,7 @@ from timeside.core.api import IAnalyzer
 import numpy as np
 
 from features import hcqt
+import librosa.filters as filters
 
 
 class NYUHCQT(Analyzer):
@@ -23,7 +24,8 @@ class NYUHCQT(Analyzer):
                  fmin=32.7,
                  bins_per_octave=60,
                  n_octaves=6,
-                 harmonics=(0.5, 1, 2, 3, 4, 5)):
+                 harmonics=(0.5, 1, 2, 3, 4, 5),
+                 buffer_size=1000):
         super(NYUHCQT, self).__init__()
         self.input_blocksize = input_blocksize
         self.input_stepsize = input_stepsize
@@ -32,6 +34,21 @@ class NYUHCQT(Analyzer):
         self.bins_per_octave = bins_per_octave
         self.n_octaves = n_octaves
         self.harmonics = harmonics
+        self.buffer_size = buffer_size
+
+        lengths = filters.constant_q_lengths(self.input_samplerate,
+                                             fmin=self.fmin,
+                                             n_bins=self.n_octaves * self.bins_per_octave,
+                                             bins_per_octave=self.bins_per_octave,
+                                             tuning=0.0,
+                                             window='hann',
+                                             filter_scale=1)
+
+        self.buffer_margin_size = int(round(lengths[0] / self.input_blocksize))
+
+        self.buffer = [np.zeros(self.input_blocksize), ] * self.buffer_margin_size
+
+        self.cleanup = False
 
 
     @interfacedoc
@@ -65,17 +82,30 @@ class NYUHCQT(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(frames)
+        self.buffer.append(frames)
+
+        if len(self.buffer) == self.buffer_size:
+            y_hcqt, _ = hcqt(np.hstack(self.buffer), sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
+                             bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
+                             harmonics=self.harmonics)
+            self.values.append(y_hcqt[:, :, self.buffer_margin_size:(self.buffer_size - self.buffer_margin_size)])
+            del self.buffer[:(self.buffer_size - self.buffer_margin_size - self.buffer_margin_size)]
+            self.cleanup = False
+        else:
+            self.cleanup = True
+
         return frames, eod
 
     def post_process(self):
         result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y = np.hstack(self.values)
+        if self.cleanup:
+            y_hcqt, _ = hcqt(np.hstack(self.buffer), sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
+                             bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
+                             harmonics=self.harmonics)
+            self.values.append(y_hcqt[:, :, self.buffer_margin_size:(self.buffer_size - self.buffer_margin_size)])
 
-        y_hcqt, _ = hcqt(y, sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
-                         bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
-                         harmonics=self.harmonics)
-
-        result.data_object.value = y_hcqt
+        self.values = np.dstack(self.values)
+        self.values = np.moveaxis(self.values, -1, 0)
+        result.data_object.value = self.values
         self.add_result(result)

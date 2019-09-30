@@ -59,17 +59,15 @@ class NYULogSpectrogam(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(frames)
+        y_logspec = logspec(y=frames,
+                            n_fft=self.input_blocksize,
+                            hop_size=self.input_stepsize, )
+        assert (y_logspec.shape[1] == 1)
+        self.values.append(y_logspec.reshape(-1))
         return frames, eod
 
     def post_process(self):
         result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y_frames = np.vstack(self.values).T
-
-        y_logspec = logspec(y_frames=y_frames,
-                            n_fft=self.input_blocksize,
-                            hop_size=self.input_stepsize, )
-
-        result.data_object.value = y_logspec
+        result.data_object.value = self.values
         self.add_result(result)

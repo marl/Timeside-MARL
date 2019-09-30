@@ -7,7 +7,7 @@ from timeside.core.analyzer import Analyzer
 from timeside.core.api import IAnalyzer
 import numpy as np
 
-from features import vggish_melspec
+from features import vggish_melspec, vggish_params
 
 
 class NYUVGGishMelSpectrogam(Analyzer):
@@ -17,8 +17,8 @@ class NYUVGGishMelSpectrogam(Analyzer):
 
     @store_parameters
     def __init__(self,
-                 input_blocksize=256, # b/c we are accumulating
-                 input_stepsize=256,
+                 input_blocksize=int(round(22050 * vggish_params.STFT_WINDOW_LENGTH_SECONDS)),
+                 input_stepsize=int(round(22050 * vggish_params.STFT_HOP_LENGTH_SECONDS)),
                  input_samplerate=22050):
         super(NYUVGGishMelSpectrogam, self).__init__()
         self.input_blocksize = input_blocksize
@@ -57,16 +57,11 @@ class NYUVGGishMelSpectrogam(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(frames)
+        self.values.append(vggish_melspec(None, frames=[frames,], sr=self.input_samplerate, do_resample=False).flatten())
         return frames, eod
 
     def post_process(self):
         result = self.new_result(data_mode='value', time_mode='framewise')
 
-        y = np.hstack(self.values)
-
-        y_vggish_melspec = vggish_melspec(y=y,
-                                          sr=self.samplerate(), )
-
-        result.data_object.value = y_vggish_melspec
+        result.data_object.value = self.values
         self.add_result(result)
