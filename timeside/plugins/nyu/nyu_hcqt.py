@@ -45,8 +45,8 @@ class NYUHCQT(Analyzer):
                                              filter_scale=1)
 
         self.buffer_margin_size = int(round(lengths[0] / self.input_blocksize))
-
-        self.buffer = [np.zeros(self.input_blocksize), ] * self.buffer_margin_size
+        self.buffer = np.zeros(self.input_blocksize * self.buffer_size)
+        self.idx = self.buffer_margin_size * self.input_blocksize
 
         self.cleanup = False
 
@@ -82,14 +82,18 @@ class NYUHCQT(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.buffer.append(frames)
+        self.buffer[self.idx:(self.idx + frames.shape[0])] = frames
+        self.idx += frames.shape[0]
 
-        if len(self.buffer) == self.buffer_size:
-            y_hcqt, _ = hcqt(np.hstack(self.buffer), sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
+        if self.idx == (self.buffer_size * self.input_blocksize):
+            y_hcqt, _ = hcqt(self.buffer, sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
                              bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
                              harmonics=self.harmonics)
             self.values.append(y_hcqt[:, :, self.buffer_margin_size:(self.buffer_size - self.buffer_margin_size)])
-            del self.buffer[:(self.buffer_size - self.buffer_margin_size - self.buffer_margin_size)]
+
+            offset = 2 * self.buffer_margin_size * self.input_blocksize
+            self.buffer = np.roll(self.buffer, offset)
+            self.idx = offset
             self.cleanup = False
         else:
             self.cleanup = True
@@ -100,7 +104,7 @@ class NYUHCQT(Analyzer):
         result = self.new_result(data_mode='value', time_mode='framewise')
 
         if self.cleanup:
-            y_hcqt, _ = hcqt(np.hstack(self.buffer), sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
+            y_hcqt, _ = hcqt(self.buffer[:self.idx], sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
                              bins_per_octave=self.bins_per_octave, n_octaves=self.n_octaves,
                              harmonics=self.harmonics)
             self.values.append(y_hcqt[:, :, self.buffer_margin_size:(self.buffer_size - self.buffer_margin_size)])
