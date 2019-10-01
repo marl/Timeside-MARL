@@ -22,6 +22,7 @@ from vggish import vggish_params
 
 from multiprocessing import Pool
 
+
 def process_arguments(args):
     parser = argparse.ArgumentParser(description=__doc__)
 
@@ -128,7 +129,8 @@ def melspec(y=None, y_frames=None, sr=22050, n_fft=2048,
                                n_fft=n_fft,
                                hop_length=hop_size,
                                fmin=fmin,
-                               n_mels=n_mels)
+                               n_mels=n_mels,
+                               center=False)
     return y_melspec.astype(np.float32)
 
 
@@ -310,7 +312,8 @@ def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512):
         S = stft(y,
                  n_fft=n_fft,
                  hop_length=hop_size,
-                 window=win)
+                 window=win,
+                 center=False)
 
     Sm = np.abs(S)
     Sp = np.angle(S)
@@ -327,7 +330,8 @@ def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, fmin=0.0,
     if y_frames is not None:
         S = frames_stft(y_frames=y_frames,
                         n_fft=n_fft,
-                        window=win)
+                        window=win,
+                        center=False)
     else:
         if y is None:
             raise Exception('y or frames must be defined.')
@@ -336,7 +340,8 @@ def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, fmin=0.0,
         S = stft(y,
                  n_fft=n_fft,
                  hop_length=hop_size,
-                 window=win)
+                 window=win,
+                 center=False)
 
     y_spec = np.abs(S) / (2 * np.sum(win))
 
@@ -361,7 +366,8 @@ def hcqt(y, sr=22050, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, 
                     hop_length=hop_size,
                     fmin=fmin * h,
                     n_bins=n_octaves * bins_per_octave,
-                    bins_per_octave=bins_per_octave)
+                    bins_per_octave=bins_per_octave,
+                    res_type='kaiser_best')
 
         y_cqt = fix_length(y_cqt, n_frames)
 
@@ -376,15 +382,19 @@ def hcqt(y, sr=22050, hop_size=256, fmin=32.7, bins_per_octave=60, n_octaves=6, 
     return cqt_mag, cqt_phase
 
 
-def vggish_melspec(y, sr=22050):
+def vggish_melspec(y, sr=22050, do_resample=False, frames=None):
     """
     Extract melspec for vggish model
     """
-    if sr != vggish_params.SAMPLE_RATE:
+    if sr != vggish_params.SAMPLE_RATE and do_resample:
+        if frames is not None:
+            raise Exception("Resampled not supported with frames argument.")
         y = resample(y, sr, vggish_params.SAMPLE_RATE)
+        sr = vggish_params.SAMPLE_RATE
 
     log_mel = mel_features.log_mel_spectrogram(y,
-                                               audio_sample_rate=vggish_params.SAMPLE_RATE,
+                                               frames=frames,
+                                               audio_sample_rate=sr,
                                                log_offset=vggish_params.LOG_OFFSET,
                                                window_length_secs=vggish_params.STFT_WINDOW_LENGTH_SECONDS,
                                                hop_length_secs=vggish_params.STFT_HOP_LENGTH_SECONDS,

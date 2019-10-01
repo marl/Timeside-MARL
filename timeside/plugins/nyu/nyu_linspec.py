@@ -59,14 +59,15 @@ class NYULinearSpectrogam(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(frames)
+        y_linspec, _ = linspec(y=frames,
+                               n_fft=self.input_blocksize,
+                               hop_size=self.input_stepsize)
+        assert(y_linspec.shape[1] == 1)
+        self.values.append(y_linspec.reshape(-1))
         return frames, eod
 
     def post_process(self):
         self.result = self.new_result(data_mode='value', time_mode='framewise')
 
-        self.result.data_object.value, _ = linspec(y_frames=np.vstack(self.values).T,
-                               n_fft=self.input_blocksize,
-                               hop_size=self.input_stepsize, )
-
-        self.add_result(self.result)
+        result.data_object.value = self.values
+        self.add_result(result)

@@ -63,17 +63,19 @@ class NYUMelSpectrogam(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(frames)
-        return frames, eod
-
-    def post_process(self):
-        self.result = self.new_result(data_mode='value', time_mode='framewise')
-
-        self.result.data_object.value = melspec(y_frames=np.vstack(self.values).T,
+        y_melspec = melspec(y=frames,
                             sr=self.samplerate(),
                             n_fft=self.input_blocksize,
                             hop_size=self.input_stepsize,
                             n_mels=self.n_mels,
                             fmin=self.fmin)
 
-        self.add_result(self.result)
+        assert (y_melspec.shape[1] == 1)
+        self.values.append(y_melspec.reshape(-1))
+        return frames, eod
+
+    def post_process(self):
+        result = self.new_result(data_mode='value', time_mode='framewise')
+
+        result.data_object.value = self.values
+        self.add_result(result)
