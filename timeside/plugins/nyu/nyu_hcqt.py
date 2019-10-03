@@ -111,5 +111,5 @@ class NYUHCQT(Analyzer):
 
         self.values = np.dstack(self.values)
         self.values = np.moveaxis(self.values, -1, 0)
-        result.data_object.value = self.values
+        self.result.data_object.value = self.values
         self.add_result(result)
