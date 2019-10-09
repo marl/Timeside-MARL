@@ -20,12 +20,18 @@ class NYULogSpectrogam(Analyzer):
                  input_blocksize=1024,
                  input_stepsize=221,
                  input_samplerate=22050,
-                 fft_size=1024):
+                 fft_size=1024,
+                 f_min=40.0,
+                 bins_per_octave=8,
+                 n_octaves=8):
         super(NYULogSpectrogam, self).__init__()
         self.input_blocksize = input_blocksize
         self.input_stepsize = input_stepsize
         self.input_samplerate = input_samplerate
         self.fft_size = fft_size
+        self.bins_per_octave = bins_per_octave
+        self.n_octaves = n_octaves
+        self.f_min = f_min
 
 
     @interfacedoc
@@ -61,7 +67,10 @@ class NYULogSpectrogam(Analyzer):
     def process(self, frames, eod=False):
         y_logspec = logspec(y=frames,
                             n_fft=self.input_blocksize,
-                            hop_size=self.input_stepsize, )
+                            hop_size=self.input_stepsize,
+                            bins_per_octave=self.bins_per_octave,
+                            f_min=self.f_min,
+                            n_octaves=self.n_octaves)
         assert (y_logspec.shape[1] == 1)
         self.values.append(y_logspec.reshape(-1))
         return frames, eod
