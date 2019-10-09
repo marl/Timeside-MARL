@@ -26,6 +26,8 @@ class NYULinearSpectrogam(Analyzer):
         self.input_stepsize = input_stepsize
         self.input_samplerate = input_samplerate
         self.fft_size = fft_size
+        self.frame_idx = 0
+        self.values = None
 
 
     @interfacedoc
@@ -34,7 +36,8 @@ class NYULinearSpectrogam(Analyzer):
               blocksize=None,
               totalframes=None):
         super(NYULinearSpectrogam, self).setup(channels, samplerate, blocksize, totalframes)
-        self.values = []
+        totalblocks = (self.totalframes() - self.input_blocksize) / self.input_stepsize + 2
+        self.values = np.empty([totalblocks, self.fft_size / 2 + 1])
 
 
     @staticmethod
@@ -63,7 +66,8 @@ class NYULinearSpectrogam(Analyzer):
                                n_fft=self.input_blocksize,
                                hop_size=self.input_stepsize)
         assert(y_linspec.shape[1] == 1)
-        self.values.append(y_linspec.reshape(-1))
+        self.values[self.frame_idx, :] = y_linspec.reshape(-1)
+        self.frame_idx += 1
         return frames, eod
 
     def post_process(self):
