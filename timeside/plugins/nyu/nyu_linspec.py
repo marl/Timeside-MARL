@@ -76,7 +76,6 @@ class NYULinearSpectrogam(Analyzer):
         return frames, eod
 
     def post_process(self):
-        self.result = self.new_result(data_mode='value', time_mode='framewise')
-
+        result = self.new_result(data_mode='value', time_mode='framewise')
         result.data_object.value = self.values
         self.add_result(result)

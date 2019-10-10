@@ -113,7 +113,7 @@ class NYUHCQT(Analyzer):
         return frames, eod
 
     def post_process(self):
-        self.result = self.new_result(data_mode='value', time_mode='framewise')
+        result = self.new_result(data_mode='value', time_mode='framewise')
 
         if self.cleanup:
             y_hcqt, _ = hcqt(self.buffer[:self.idx], sr=self.samplerate(), hop_size=self.input_stepsize, fmin=self.fmin,
@@ -125,5 +125,5 @@ class NYUHCQT(Analyzer):
 
         self.values = np.dstack(self.values)
         self.values = np.moveaxis(self.values, -1, 0)
-        self.result.data_object.value = self.values
-        self.add_result(self.result)
+        result.data_object.value = self.values
+        self.add_result(result)

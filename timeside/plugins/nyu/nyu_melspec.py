@@ -85,6 +85,5 @@ class NYUMelSpectrogam(Analyzer):
 
     def post_process(self):
         result = self.new_result(data_mode='value', time_mode='framewise')
-
         result.data_object.value = self.values
         self.add_result(result)
