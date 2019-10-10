@@ -24,6 +24,8 @@ class NYUVGGishMelSpectrogam(Analyzer):
         self.input_blocksize = input_blocksize
         self.input_stepsize = input_stepsize
         self.input_samplerate = input_samplerate
+        self.frame_idx = 0
+        self.values = None
 
 
     @interfacedoc
@@ -32,7 +34,8 @@ class NYUVGGishMelSpectrogam(Analyzer):
               blocksize=None,
               totalframes=None):
         super(NYUVGGishMelSpectrogam, self).setup(channels, samplerate, blocksize, totalframes)
-        self.values = []
+        totalblocks = (self.totalframes() - self.input_blocksize) / self.input_stepsize + 2
+        self.values = np.empty([totalblocks, 64])
 
 
     @staticmethod
@@ -57,7 +60,8 @@ class NYUVGGishMelSpectrogam(Analyzer):
     @downmix_to_mono
     @frames_adapter
     def process(self, frames, eod=False):
-        self.values.append(vggish_melspec(None, frames=[frames,], sr=self.input_samplerate, do_resample=False).flatten())
+        self.values[self.frame_idx, :] = vggish_melspec(None, frames=[frames,], sr=self.input_samplerate, do_resample=False).flatten()
+        self.frame_idx += 1
         return frames, eod
 
     def post_process(self):

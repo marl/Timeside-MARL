@@ -82,8 +82,8 @@ def frames_stft(y_frames, n_fft=2048, win_length=None, window='hann',
                            order='F')
 
     # how many columns can we fit within MAX_MEM_BLOCK?
-    n_columns = int(util.MAX_MEM_BLOCK / (stft_matrix.shape[0] *
-                                          stft_matrix.itemsize))
+    n_columns = int(util.MAX_MEM_BLOCK / float(stft_matrix.shape[0] *
+                                               stft_matrix.itemsize))
 
     for bl_s in range(0, stft_matrix.shape[1], n_columns):
         bl_t = min(bl_s + n_columns, stft_matrix.shape[1])
@@ -136,7 +136,7 @@ def melspec(y=None, y_frames=None, sr=22050, n_fft=2048,
 
 def _logspec_matrix(bins_per_octave, num_bins, f_min, fft_len, sr):
     """
-    Compute center frequencies of the log-f filterbank
+    Compute mixing matrix for log filterbank
 
     Parameters
     ----------
@@ -153,8 +153,8 @@ def _logspec_matrix(bins_per_octave, num_bins, f_min, fft_len, sr):
     # note range goes from -1 to bpo*num_oct for boundary issues
     f_cq = f_min * 2.0 ** ((np.arange(-1, num_bins+1)) / float(bins_per_octave))
     # centers in bins
-    kc = np.round(f_cq * (fft_len / sr)).astype(int)
-    c_mat = np.zeros([num_bins, int(np.round(fft_len / 2))])
+    kc = np.round(f_cq * (fft_len / float(sr))).astype(int)
+    c_mat = np.zeros([num_bins, int(np.round(fft_len / 2.0))])
     for k in range(1, kc.shape[0]-1):
         l1 = kc[k]-kc[k-1]
         w1 = scipy.signal.triang((l1 * 2) + 1)
@@ -176,7 +176,7 @@ def _onset_patterns_params(sr, f_hop_size, f_win_size, p_hop_size, p_win_size, m
     if f_win_size is None:
         # if not specified, set to 0.04 seconds (this was 0.046s at 44100Hz when rounded, as in Holzapfel's)
         f_win_size = f_hop_size * 4
-    p_sr = sr / f_hop_size
+    p_sr = sr / float(f_hop_size)
     if p_hop_size is None:
         # if not specified, set to 0.5 seconds
         p_hop_size = int(np.round(0.5 * p_sr))
@@ -202,7 +202,7 @@ def _onset_detection_fn(x, f_win_size, f_hop_size, f_bins_per_octave, f_octaves,
                   hop_length=f_hop_size,
                   win_length=f_win_size,
                   window=f_win)
-    x_spec = np.abs(x_spec) / (2 * np.sum(f_win))
+    x_spec = np.abs(x_spec) / float(2 * np.sum(f_win))
 
     f_cq_mat = _logspec_matrix(f_bins_per_octave, f_octaves * f_bins_per_octave, f_fmin, f_win_size, sr)
     x_cq_spec = np.dot(f_cq_mat, x_spec[:-1, :])
@@ -276,7 +276,7 @@ def onset_patterns(x,
     od_fun, x_cq_spec = _onset_detection_fn(x, f_win_size, f_hop_size, f_bins_per_octave, f_octaves, f_fmin, sr, mean_filter_size)
 
     # calculate periodicity constant-q transform
-    ops = np.empty([od_fun.shape[0], p_octaves * p_bins_per_octave, int(np.ceil(od_fun.shape[1] / p_hop_size))])
+    ops = np.empty([od_fun.shape[0], p_octaves * p_bins_per_octave, int(np.ceil(od_fun.shape[1] / float(p_hop_size)))])
     p_cq_mat = _logspec_matrix(p_bins_per_octave, p_octaves * p_bins_per_octave, p_fmin, p_win_size, p_sr)
     p_win = scipy.signal.hanning(p_win_size)
     for i in range(od_fun.shape[0]):
@@ -321,7 +321,7 @@ def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512):
     return Sm.astype(np.float32), Sp.astype(np.float32)
 
 
-def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, fmin=0.0, bins_per_octave=8, n_octaves=8):
+def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, f_min=40.0, bins_per_octave=8, n_octaves=8):
     """
     Magnitude of logf-spectrogram
     """
@@ -345,7 +345,7 @@ def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, fmin=0.0,
 
     y_spec = np.abs(S) / (2 * np.sum(win))
 
-    log_mat = _logspec_matrix(bins_per_octave, n_octaves * bins_per_octave, fmin, n_fft, sr)
+    log_mat = _logspec_matrix(bins_per_octave, n_octaves * bins_per_octave, f_min, n_fft, sr)
     y_logspec = np.dot(log_mat, y_spec[:-1, :])
 
     return y_logspec.astype(np.float32)

@@ -30,6 +30,8 @@ class NYUMelSpectrogam(Analyzer):
         self.fft_size = fft_size
         self.n_mels = n_mels
         self.fmin = fmin
+        self.frame_idx = 0
+        self.values = None
 
 
     @interfacedoc
@@ -38,7 +40,8 @@ class NYUMelSpectrogam(Analyzer):
               blocksize=None,
               totalframes=None):
         super(NYUMelSpectrogam, self).setup(channels, samplerate, blocksize, totalframes)
-        self.values = []
+        totalblocks = (self.totalframes() - self.input_blocksize) / self.input_stepsize + 2
+        self.values = np.empty([totalblocks, self.n_mels])
 
 
     @staticmethod
@@ -71,7 +74,8 @@ class NYUMelSpectrogam(Analyzer):
                             fmin=self.fmin)
 
         assert (y_melspec.shape[1] == 1)
-        self.values.append(y_melspec.reshape(-1))
+        self.values[self.frame_idx, :] = y_melspec.reshape(-1)
+        self.frame_idx += 1
         return frames, eod
 
     def post_process(self):
