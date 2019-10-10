@@ -61,6 +61,11 @@ class NYULogSpectrogam(Analyzer):
     def unit():
         return ""
 
+    @staticmethod
+    @interfacedoc
+    def version():
+        return '1.0'
+
     @property
     def force_samplerate(self):
         return self.input_samplerate
