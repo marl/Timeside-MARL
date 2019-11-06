@@ -45,17 +45,17 @@ KEYWORDS = 'audio analysis features extraction MIR transcoding graph visualize p
 
 setup(
     # Package
-    name='TimeSide-Dummy',
+    name='TimeSide-MARL',
     install_requires=[
-        'timeside',
+        #'timeside',
         # Dependencies for Dummy analyzers
         ],
     # PyPI
     url='https://github.com/Parisson/TimeSide-Dummy',
-    description="Dummy TimeSide plugins",
+    description="TimeSide MARL (NYU) plugin",
     long_description=open('README.rst').read(),
-    author="Guillaume Pellerin, Thomas Fillon",
-    author_email="yomguy@parisson.com, thomas@parisson.com",
+    author="Mark Cartwright",
+    author_email="mark.cartwright@nyu.edu",
     version='0.1',
     platforms=['OS Independent'],
     license='MIT',

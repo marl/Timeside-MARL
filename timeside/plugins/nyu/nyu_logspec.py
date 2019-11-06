@@ -61,6 +61,11 @@ class NYULogSpectrogam(Analyzer):
     def unit():
         return ""
 
+    @staticmethod
+    @interfacedoc
+    def version():
+        return '1.0'
+
     @property
     def force_samplerate(self):
         return self.input_samplerate
@@ -81,6 +86,5 @@ class NYULogSpectrogam(Analyzer):
 
     def post_process(self):
         result = self.new_result(data_mode='value', time_mode='framewise')
-
         result.data_object.value = self.values
         self.add_result(result)
