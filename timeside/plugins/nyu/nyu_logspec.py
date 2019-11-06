@@ -7,7 +7,7 @@ from timeside.core.analyzer import Analyzer
 from timeside.core.api import IAnalyzer
 import numpy as np
 
-from features import logspec
+from features import logspec, _logspec_matrix
 
 
 class NYULogSpectrogam(Analyzer):
@@ -44,6 +44,10 @@ class NYULogSpectrogam(Analyzer):
         super(NYULogSpectrogam, self).setup(channels, samplerate, blocksize, totalframes)
         totalblocks = (self.totalframes() - self.input_blocksize) / self.input_stepsize + 2
         self.values = np.empty([totalblocks, self.bins_per_octave * self.n_octaves])
+        self.log_mat = _logspec_matrix(self.bins_per_octave,
+                                       self.n_octaves * self.bins_per_octave,
+                                       self.f_min,
+                                       self.fft_size, self.input_samplerate)
 
 
     @staticmethod
@@ -78,7 +82,8 @@ class NYULogSpectrogam(Analyzer):
                             hop_size=self.input_stepsize,
                             bins_per_octave=self.bins_per_octave,
                             f_min=self.f_min,
-                            n_octaves=self.n_octaves)
+                            n_octaves=self.n_octaves,
+                            log_mat=self.log_mat)
         assert (y_logspec.shape[1] == 1)
         self.values[self.frame_idx, :] = y_logspec.reshape(-1)
         self.frame_idx += 1

@@ -69,7 +69,8 @@ class NYULinearSpectrogam(Analyzer):
     def process(self, frames, eod=False):
         y_linspec, _ = linspec(y=frames,
                                n_fft=self.input_blocksize,
-                               hop_size=self.input_stepsize)
+                               hop_size=self.input_stepsize,
+                               return_angle=False)
         assert(y_linspec.shape[1] == 1)
         self.values[self.frame_idx, :] = y_linspec.reshape(-1)
         self.frame_idx += 1

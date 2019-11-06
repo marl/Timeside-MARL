@@ -296,7 +296,7 @@ def onset_patterns(x,
     return ops
 
 
-def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512):
+def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512, return_angle=True):
     """
     Magnitude of linear spectrum
     """
@@ -315,13 +315,18 @@ def linspec(y=None, y_frames=None, n_fft=2048, hop_size=512):
                  window=win,
                  center=False)
 
-    Sm = np.abs(S)
-    Sp = np.angle(S)
+    Sm = np.abs(S).astype(np.float32)
 
-    return Sm.astype(np.float32), Sp.astype(np.float32)
+    if return_angle:
+        Sp = np.angle(S).astype(np.float32)
+    else:
+        Sp = None
+
+    return Sm, Sp
 
 
-def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, f_min=40.0, bins_per_octave=8, n_octaves=8):
+def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, f_min=40.0, bins_per_octave=8, n_octaves=8,
+            log_mat=None):
     """
     Magnitude of logf-spectrogram
     """
@@ -345,7 +350,8 @@ def logspec(y=None, y_frames=None, sr=22050, n_fft=1024, hop_size=221, f_min=40.
 
     y_spec = np.abs(S) / (2 * np.sum(win))
 
-    log_mat = _logspec_matrix(bins_per_octave, n_octaves * bins_per_octave, f_min, n_fft, sr)
+    if log_mat is None:
+        log_mat = _logspec_matrix(bins_per_octave, n_octaves * bins_per_octave, f_min, n_fft, sr)
     y_logspec = np.dot(log_mat, y_spec[:-1, :])
 
     return y_logspec.astype(np.float32)
